@@ -1,7 +1,9 @@
-# Runbook — Phases B (schema-stable) and C–F
+# Runbook (v4) - Reproduce Final Results
 
 This runbook assumes Phase A already produced:
 - `artifacts/data_15min.parquet`
+
+All commands below are PowerShell.
 
 ## 0) Activate venv
 
@@ -10,98 +12,78 @@ Set-Location "E:\ML Based Prediction Air Pollutants"
 .\.venv_std\Scripts\python.exe -V
 ```
 
-## 1) (Recommended) Re-run Phase B with schema stabilization (write v3 artifacts)
-
-This is the highest-ROI fix for improving RF/XGB: it prevents train/val/test column drift.
+## 1) Phase B (v4 features) - schema-stable + leakage-safe target capping
 
 ```powershell
-.\.venv_std\Scripts\python.exe .\2_preprocess_and_features.py `
-  --in-parquet  .\artifacts\data_15min.parquet `
-  --out-train   .\artifacts\features_train_v3.parquet `
-  --out-val     .\artifacts\features_val_v3.parquet `
-  --out-test    .\artifacts\features_test_v3.parquet `
-  --scaler-json .\artifacts\standard_scaler_v3.json `
+.\.venv_std\Scripts\python.exe ".\2_preprocess_and_features.py" `
+  --in-parquet ".\artifacts\data_15min.parquet" `
+  --out-train ".\artifacts\features_train_v4.parquet" `
+  --out-val ".\artifacts\features_val_v4.parquet" `
+  --out-test ".\artifacts\features_test_v4.parquet" `
+  --scaler-json ".\artifacts\standard_scaler_v4.json" `
   --schema-stable `
-  --schema-json .\artifacts\feature_schema_v3.json `
+  --schema-json ".\artifacts\feature_schema_v4.json" `
+  --target-cap-quantile 0.995 `
   --log-level INFO
 ```
 
-Optional (recommended if PM2.5 has extreme spikes):
-- Add `--target-cap-quantile 0.995` to cap the target using a TRAIN-only quantile per station (leakage-safe).
-
-Optional sanity check (fast):
+Sanity check:
 ```powershell
-.\.venv_std\Scripts\python.exe .\tools\check_feature_splits.py `
-  --train .\artifacts\features_train_v3.parquet `
-  --val   .\artifacts\features_val_v3.parquet `
-  --test  .\artifacts\features_test_v3.parquet `
-  --out-json .\artifacts\feature_splits_report_v3.json
+.\.venv_std\Scripts\python.exe ".\tools\check_feature_splits.py" `
+  --train ".\artifacts\features_train_v4.parquet" `
+  --val ".\artifacts\features_val_v4.parquet" `
+  --test ".\artifacts\features_test_v4.parquet" `
+  --out-json ".\artifacts\feature_splits_report_v4.json"
 ```
 
-## 2) Phase C — Train classical models (Ridge / RF / XGB)
+## 2) Phase C (per-station classical training) + routing (final system)
 
+Train per-station Ridge/RF/XGB and tune XGB quickly (8 configs per station):
 ```powershell
-.\.venv_std\Scripts\python.exe .\3_train_classical.py `
-  --train .\artifacts\features_train_v3.parquet `
-  --val   .\artifacts\features_val_v3.parquet `
-  --test  .\artifacts\features_test_v3.parquet `
-  --per-station-metrics `
+.\.venv_std\Scripts\python.exe ".\3_train_classical.py" `
+  --train ".\artifacts\features_train_v4.parquet" `
+  --val ".\artifacts\features_val_v4.parquet" `
+  --test ".\artifacts\features_test_v4.parquet" `
+  --per-station `
+  --xgb-tune `
   --log-level INFO
 ```
 
-Optional upgrades:
-- Tune XGBoost quickly on validation (8 configs):
-  - add `--xgb-tune`
-- Train per-station models (often boosts BHATAGAON without hurting others):
-  - add `--per-station`
-  - outputs `artifacts/classical_metrics_per_station.json` + `artifacts/model_*_{STATION}.*`
-
-Speed knobs (optional):
-- Keep Ridge full-data (default), but cap RF/XGB:
-  - `--max-train-rows 50000 --xgb-max-train-rows 50000`
-- Or train XGB on more rows:
-  - `--xgb-max-train-rows 150000`
-
-Outputs:
-- `artifacts/model_ridge.pkl`
-- `artifacts/model_rf.pkl`
-- `artifacts/model_xgb.json`
-- `artifacts/classical_metrics.json`
-
-## 2b) (Recommended) Route the best model per station (validation-based)
-
-After running `3_train_classical.py --per-station`, you can compute an overall score
-using "best per station" routing (chosen by validation RMSE). This often boosts the
-overall R² when one station behaves very differently (e.g., BHATAGAON).
-
+Route the best model per station by validation RMSE and evaluate on test:
 ```powershell
-.\.venv_std\Scripts\python.exe .\9_route_models_by_station.py `
-  --train .\artifacts\features_train_v3.parquet `
-  --val   .\artifacts\features_val_v3.parquet `
-  --test  .\artifacts\features_test_v3.parquet `
-  --out-json .\artifacts\classical_metrics_routed.json `
+.\.venv_std\Scripts\python.exe ".\9_route_models_by_station.py" `
+  --train ".\artifacts\features_train_v4.parquet" `
+  --val ".\artifacts\features_val_v4.parquet" `
+  --test ".\artifacts\features_test_v4.parquet" `
+  --out-json ".\artifacts\classical_metrics_routed_v4.json" `
   --log-level INFO
 ```
 
-Outputs:
-- `artifacts/classical_metrics_routed.json`
-
-## 3) Phase D — LSTM (optional; only if time permits)
-
-If you run LSTM, keep it lightweight due to the deadline and environment variability.
+## 3) Phase D (LSTM baseline)
 
 ```powershell
-.\.venv_std\Scripts\python.exe .\4_train_lstm.py --seq-len 96 --epochs 20
+.\.venv_std\Scripts\python.exe ".\4_train_lstm.py" `
+  --train ".\artifacts\features_train_v4.parquet" `
+  --val ".\artifacts\features_val_v4.parquet" `
+  --test ".\artifacts\features_test_v4.parquet" `
+  --seq-len 96 `
+  --batch-size 128 `
+  --epochs 20 `
+  --reduce-lr-on-plateau `
+  --log-level INFO
 ```
 
-## 4) Phase E — Evaluate models
+## 4) Phase E/F (final evaluation + plots)
 
 ```powershell
-.\.venv_std\Scripts\python.exe .\6_evaluate_models.py
+.\.venv_std\Scripts\python.exe ".\5_evaluate_and_plot.py" `
+  --test ".\artifacts\features_test_v4.parquet" `
+  --artifacts-dir ".\artifacts" `
+  --lstm-model ".\artifacts\model_lstm.keras" `
+  --lstm-scalers ".\artifacts\lstm_scalers.pkl" `
+  --out-metrics ".\artifacts\metrics.csv" `
+  --out-plots ".\artifacts\plots" `
+  --dpi 300 `
+  --log-level INFO
 ```
 
-## 5) Phase F — Plots
-
-```powershell
-.\.venv_std\Scripts\python.exe .\7_plots.py
-```

@@ -1,42 +1,85 @@
-# Air Quality Prediction (PM2.5) — Final Submission
+# Air Quality Prediction (PM2.5) - Final Submission
 
-This repository contains a complete, deadline-friendly pipeline for **PM2.5 prediction** from messy station Excel logs:
+This repository predicts **PM2.5** from multi-station air-quality time series (15-minute data) using:
+- Classical models: Ridge / Random Forest / XGBoost
+- Deep learning baseline: LSTM (TensorFlow/Keras)
+- Final strategy: **station-aware routing** (best model chosen per station on validation)
 
-1. **Phase A** — Excel ingestion & reshape (`1_ingest_excel.py`)
-2. **Phase B** — Cleaning + feature engineering (`2_preprocess_and_features.py`)
-3. **Phase C** — Classical models + per-station routing (`3_train_classical.py`, `9_route_models_by_station.py`)
-4. **Phase D** — LSTM (TensorFlow/Keras) (`4_train_lstm.py`)
-5. **Phase E/F** — Final evaluation + report-ready plots (`5_evaluate_and_plot.py`)
+Large data (raw Excel + parquet splits + big model binaries) is intentionally not tracked in GitHub. The repo is readable on GitHub without running anything: metrics + plots are committed.
 
-## Final Results (Test)
+## What to open first (no running required)
 
-Primary final system (recommended): **Per-station routed classical models**.
-- Output: `artifacts/classical_metrics_routed_v4.json`
-- Global test: **R² ≈ 0.9607**, RMSE ≈ 3.94 (PM2.5 units)
+- Final routed result (station-aware ensemble): `artifacts/classical_metrics_routed_v4.json`
+- LSTM result + tensor-shape/scalers info: `artifacts/lstm_metrics.json`
+- Unified comparison table (global + per-station): `artifacts/metrics.csv`
+- Plots (dpi=300): `artifacts/plots/*.png`
 
-Deep learning baseline: LSTM.
-- Output: `artifacts/lstm_metrics.json`
-- Global test: **R² ≈ 0.8978**, RMSE ≈ 6.29
+## Results at a glance (Test)
 
-Unified comparison table across models (global + station):
-- Output: `artifacts/metrics.csv`
+### Routed classical ensemble (recommended final system)
 
-Plots (dpi=300):
-- `artifacts/plots/AIIMS_timeseries_3day_xgb_vs_lstm.png`
-- `artifacts/plots/scatter_xgb_vs_lstm.png`
-- `artifacts/plots/model_comparison_bars.png`
+Chosen per station (by **validation RMSE**):
+- AIIMS -> XGBoost
+- BHATAGAON -> Ridge
+- IGKV -> Ridge
+- SILTARA -> Ridge
 
-## How to Reproduce (high level)
+Global test (from `artifacts/classical_metrics_routed_v4.json`):
+- RMSE: **3.94**
+- MAE: **1.43**
+- R²: **0.9607**
 
-See `PHASES_RUNBOOK.md` for the exact PowerShell commands used to regenerate the v4 features, train models, and generate the report plots.
+### Unified comparison (global, aligned evaluation window)
+
+The table in `artifacts/metrics.csv` evaluates all 4 models on the same aligned rows
+(LSTM cannot predict the first `T=96` steps per station).
+
+| Model | RMSE | MAE | R² |
+|---|---:|---:|---:|
+| ridge | 3.65 | 1.38 | 0.9657 |
+| xgb | 3.84 | 1.48 | 0.9620 |
+| lstm | 6.29 | 3.04 | 0.8978 |
+| rf | 31.82 | 16.43 | -1.611 |
+
+> Note: Random Forest is included for completeness, but it performs poorly here.
+
+## Plots (report-ready)
+
+Prediction vs Actual (3-day window, AIIMS, XGBoost vs LSTM):
+![AIIMS time series](artifacts/plots/AIIMS_timeseries_3day_xgb_vs_lstm.png)
+
+Scatter comparison (XGBoost vs LSTM, with y=x):
+![Scatter](artifacts/plots/scatter_xgb_vs_lstm.png)
+
+Global bar chart comparison (RMSE and R²):
+![Bars](artifacts/plots/model_comparison_bars.png)
+
+## Pipeline overview (scripts)
+
+1. Phase A - ingestion: `1_ingest_excel.py`
+2. Phase B - preprocessing + features: `2_preprocess_and_features.py`
+   - Leakage-safe target capping (`--target-cap-quantile`)
+   - Schema stabilization across splits (`--schema-stable`)
+3. Phase C - classical models: `3_train_classical.py`
+   - Optional per-station training (`--per-station`)
+   - Optional XGB tuning sweep (`--xgb-tune`)
+4. Routing (best model per station): `9_route_models_by_station.py`
+5. Phase D - LSTM: `4_train_lstm.py`
+6. Phase E/F - evaluation + plots: `5_evaluate_and_plot.py`
+
+Exact commands used are in `PHASES_RUNBOOK.md`.
 
 ## Dependencies
 
-- Ingestion requirements: `requirements_ingest.txt`
-- ML requirements: `requirements_ml.txt`
+- Ingestion: `requirements_ingest.txt`
+- ML + plotting: `requirements_ml.txt`
 
-## Notes on GitHub size
+## GitHub size policy
 
-Large datasets / parquet splits / model binaries are intentionally ignored by `.gitignore`.
-Push only the code + small report outputs unless you explicitly set up Git LFS.
+This repo ships with only:
+- code + docs
+- small metrics JSON/CSV
+- PNG plots
+
+If you must push large datasets/models, use Git LFS (not required for this submission).
 
