@@ -1,0 +1,86 @@
+{
+  "paths": {
+    "train": "E:\\ML Based Prediction Air Pollutants\\artifacts\\features_train_v4.parquet",
+    "val": "E:\\ML Based Prediction Air Pollutants\\artifacts\\features_val_v4.parquet",
+    "test": "E:\\ML Based Prediction Air Pollutants\\artifacts\\features_test_v4.parquet"
+  },
+  "target": "PM2.5",
+  "train": {
+    "rows": 279570,
+    "cols": 589,
+    "stations": [
+      "AIIMS",
+      "BHATAGAON",
+      "IGKV",
+      "SILTARA"
+    ],
+    "target": {
+      "present": true,
+      "nan": 0,
+      "min": 0.0,
+      "max": 183.42599999999948,
+      "neg": 0,
+      "gt_1e5": 0
+    },
+    "rows_by_station": {
+      "AIIMS": 78672,
+      "BHATAGAON": 72186,
+      "SILTARA": 68146,
+      "IGKV": 60566
+    }
+  },
+  "val": {
+    "rows": 65080,
+    "cols": 589,
+    "stations": [
+      "AIIMS",
+      "BHATAGAON",
+      "IGKV",
+      "SILTARA"
+    ],
+    "target": {
+      "present": true,
+      "nan": 0,
+      "min": 0.0,
+      "max": 183.42599999999948,
+      "neg": 0,
+      "gt_1e5": 0
+    },
+    "rows_by_station": {
+      "AIIMS": 17515,
+      "BHATAGAON": 17241,
+      "SILTARA": 15906,
+      "IGKV": 14418
+    }
+  },
+  "test": {
+    "rows": 65062,
+    "cols": 589,
+    "stations": [
+      "AIIMS",
+      "BHATAGAON",
+      "IGKV",
+      "SILTARA"
+    ],
+    "target": {
+      "present": true,
+      "nan": 0,
+      "min": 0.0,
+      "max": 183.42599999999948,
+      "neg": 0,
+      "gt_1e5": 0
+    },
+    "rows_by_station": {
+      "BHATAGAON": 18289,
+      "AIIMS": 18027,
+      "SILTARA": 14452,
+      "IGKV": 14294
+    }
+  },
+  "schema_diff": {
+    "val_missing_from_train": [],
+    "val_extra_vs_train": [],
+    "test_missing_from_train": [],
+    "test_extra_vs_train": []
+  }
+}

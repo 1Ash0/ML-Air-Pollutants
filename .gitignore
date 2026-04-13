@@ -1,0 +1,52 @@
+# Python / venv
+__pycache__/
+*.py[cod]
+.Python
+*.egg-info/
+.codex/
+.venv*/
+.py_std/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data (do not push to GitHub)
+Dataset/
+*.xlsx
+*.xls
+*.xlsm
+*.csv
+
+# Artifacts (keep only small, report-ready outputs)
+artifacts/*.parquet
+artifacts/**/*.parquet
+artifacts/data_15min.parquet
+artifacts/_ingest_chunks/
+artifacts/*.log
+artifacts/profile_report.md
+artifacts/check_*.py
+
+# Models (can be huge; use Git LFS if you must)
+artifacts/*.pkl
+artifacts/**/*.pkl
+artifacts/*.json
+artifacts/**/*_meta.json
+artifacts/*.keras
+artifacts/**/*.keras
+
+# Allow small final report outputs in artifacts
+!artifacts/metrics.csv
+!artifacts/classical_metrics_routed_v4.json
+!artifacts/classical_metrics_per_station.json
+!artifacts/lstm_metrics.json
+!artifacts/feature_schema_v4.json
+!artifacts/standard_scaler_v4.json
+!artifacts/feature_splits_report_v4.json
+!artifacts/plots/
+!artifacts/plots/*.png
+
+# Local backup bundles
+artifacts/backup_models_*/
+artifacts/FINAL_*/
+artifacts/SUBMISSION_*/
