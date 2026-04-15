@@ -18,14 +18,14 @@ Air quality follows a strict daily rhythm.
 *   **AIIMS/IGKV:** Peak during early morning and late night due to temperature inversion.
 *   **Bhatagaon:** Shows strong logistic/transport influence (near a major bus terminal).
 
-![Diurnal Patterns](artifacts/plots/viva/01_data_overview/03_diurnal_all_stations.png)
+![Diurnal Patterns](artifacts/plots/viva/02_inter_station/01_pm25_diurnal_heatmap.png)
 
 ### 3. Cross-Station Synchrony
 Are the stations moving in sync? 
 *   **High Connection (0.74):** AIIMS and IGKV move together, sharing the city-wide atmosphere.
 *   **Low Connection (0.32):** Siltara is "decoupled," meaning its pollution is driven by local industrial stacks rather than regional weather.
 
-![Synchrony Matrix](artifacts/plots/viva/02_inter_station/cross_station_pm25_synchrony.png)
+![Synchrony Matrix](artifacts/plots/viva/03_correlation/cross_station_pm25_synchrony.png)
 
 ---
 
