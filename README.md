@@ -1,85 +1,64 @@
-# Air Quality Prediction (PM2.5) - Final Submission
+# Air Quality Prediction (PM2.5) — Multi-Station Analysis
 
-This repository predicts **PM2.5** from multi-station air-quality time series (15-minute data) using:
-- Classical models: Ridge / Random Forest / XGBoost
-- Deep learning baseline: LSTM (TensorFlow/Keras)
-- Final strategy: **station-aware routing** (best model chosen per station on validation)
+Predicting **PM2.5** across four distinct air-quality monitoring stations (AIIMS, Bhatagaon, IGKV, Siltara) using high-frequency (15-minute) time-series data. This repository implements a full pipeline: from raw Excel ingestion to a "station-aware" routed machine learning ensemble.
 
-Large data (raw Excel + parquet splits + big model binaries) is intentionally not tracked in GitHub. The repo is readable on GitHub without running anything: metrics + plots are committed.
+---
 
-## What to open first (no running required)
+## 📊 Core Dataset Insights
 
-- Final routed result (station-aware ensemble): `artifacts/classical_metrics_routed_v4.json`
-- LSTM result + tensor-shape/scalers info: `artifacts/lstm_metrics.json`
-- Unified comparison table (global + per-station): `artifacts/metrics.csv`
-- Plots (dpi=300): `artifacts/plots/*.png`
+Before modeling, we analyzed the temporal and spatial characteristics of Raipur's air quality.
 
-## Results at a glance (Test)
+### 1. Pollution Distribution & The "Industrial Island"
+Most urban stations (AIIMS, IGKV) show typical urban pollution patterns. However, **Siltara** is an industrial outlier with extreme spikes (reaching >500 µg/m³) and a significantly higher baseline.
 
-### Routed classical ensemble (recommended final system)
+![Pollution Distribution](artifacts/plots/viva/01_data_overview/02_pm25_distribution_violin_box.png)
 
-Chosen per station (by **validation RMSE**):
-- AIIMS -> XGBoost
-- BHATAGAON -> Ridge
-- IGKV -> Ridge
-- SILTARA -> Ridge
+### 2. Diurnal Rhythms (Industrial vs. Logistic)
+Air quality follows a strict daily rhythm. 
+*   **AIIMS/IGKV:** Peak during early morning and late night due to temperature inversion.
+*   **Bhatagaon:** Shows strong logistic/transport influence (near a major bus terminal).
 
-Global test (from `artifacts/classical_metrics_routed_v4.json`):
-- RMSE: **3.94**
-- MAE: **1.43**
-- R²: **0.9607**
+![Diurnal Patterns](artifacts/plots/viva/01_data_overview/03_diurnal_all_stations.png)
 
-### Unified comparison (global, aligned evaluation window)
+### 3. Cross-Station Synchrony
+Are the stations moving in sync? 
+*   **High Connection (0.74):** AIIMS and IGKV move together, sharing the city-wide atmosphere.
+*   **Low Connection (0.32):** Siltara is "decoupled," meaning its pollution is driven by local industrial stacks rather than regional weather.
 
-The table in `artifacts/metrics.csv` evaluates all 4 models on the same aligned rows
-(LSTM cannot predict the first `T=96` steps per station).
+![Synchrony Matrix](artifacts/plots/viva/02_inter_station/cross_station_pm25_synchrony.png)
 
-| Model | RMSE | MAE | R² |
-|---|---:|---:|---:|
-| ridge | 3.65 | 1.38 | 0.9657 |
-| xgb | 3.84 | 1.48 | 0.9620 |
-| lstm | 6.29 | 3.04 | 0.8978 |
-| rf | 31.82 | 16.43 | -1.611 |
+---
 
-> Note: Random Forest is included for completeness, but it performs poorly here.
+## 🧠 Modeling & Feature Engineering
 
-## Plots (report-ready)
+### Feature Strategy
+We don't just predict PM2.5 based on current weather. The air has **memory**.
+*   **Lags (15min to 24hr):** Gives the model a memory of the immediate past.
+*   **Rolling Means (1hr to 12hr):** Identifies the overall trend (rising vs. falling).
+*   **Wind/Time Cyclic Features:** Converts degrees (WD) and Hours into Sin/Cos waves for mathematical stability.
 
-Prediction vs Actual (3-day window, AIIMS, XGBoost vs LSTM):
-![AIIMS time series](artifacts/plots/AIIMS_timeseries_3day_xgb_vs_lstm.png)
+### Results: The Final Scorecard
+We evaluated Ridge, XGBoost, and LSTM models. The final system is a **Routed Ensemble**, choosing the best-validated model for each specific station's DNA.
 
-Scatter comparison (XGBoost vs LSTM, with y=x):
-![Scatter](artifacts/plots/scatter_xgb_vs_lstm.png)
+![Model Comparison](artifacts/plots/viva/04_model_performance/ridge_xgb_lstm_routed_comparison.png)
 
-Global bar chart comparison (RMSE and R²):
-![Bars](artifacts/plots/model_comparison_bars.png)
+**Global Performance (Test Set):**
+| Metric | Value |
+|---|---|
+| **RMSE** | **3.94** |
+| **MAE** | **1.43** |
+| **R² Score** | **0.9607** |
 
-## Pipeline overview (scripts)
+---
 
-1. Phase A - ingestion: `1_ingest_excel.py`
-2. Phase B - preprocessing + features: `2_preprocess_and_features.py`
-   - Leakage-safe target capping (`--target-cap-quantile`)
-   - Schema stabilization across splits (`--schema-stable`)
-3. Phase C - classical models: `3_train_classical.py`
-   - Optional per-station training (`--per-station`)
-   - Optional XGB tuning sweep (`--xgb-tune`)
-4. Routing (best model per station): `9_route_models_by_station.py`
-5. Phase D - LSTM: `4_train_lstm.py`
-6. Phase E/F - evaluation + plots: `5_evaluate_and_plot.py`
+## 🚀 How to Run the Pipeline
 
-Exact commands used are in `PHASES_RUNBOOK.md`.
+1.  **Ingestion:** `1_ingest_excel.py` — Merges disparate multi-sheet Excel files into a canonical parquet master.
+2.  **Preprocessing:** `2_preprocess_and_features.py` — Handles missing data, applies "Time-Splitting," and generates the high-dimensional feature space (Lags/Rolls).
+3.  **Classical Training:** `3_train_classical.py` — Trains optimized Ridge/XGBoost models per station.
+4.  **Routing:** `9_route_models_by_station.py` — Selects the optimal model for each station based on local cross-validation.
+5.  **Deep Learning:** `4_train_lstm.py` — Benchmarks against a 3-layer LSTM with persistent time-context.
+6.  **Visualization:** `6_viva_plots.py` — Generates the publication-quality plots seen in this README.
 
-## Dependencies
-
-- Ingestion: `requirements_ingest.txt`
-- ML + plotting: `requirements_ml.txt`
-
-## GitHub size policy
-
-This repo ships with only:
-- code + docs
-- small metrics JSON/CSV
-- PNG plots
-
-If you must push large datasets/models, use Git LFS (not required for this submission).
-
+---
+**Repository Policy:** Large data binaries (`.parquet`, `.h5`, `.joblib`) are excluded via `.gitignore`. The `artifacts/` folder contains only the metrics and plot assets for transparent review.

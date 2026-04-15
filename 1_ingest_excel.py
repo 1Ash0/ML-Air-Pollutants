@@ -206,7 +206,10 @@ def _parse_timestamps(series: pd.Series) -> pd.Series:
     # Handle Excel serial dates (common for datetime cells exported as numbers)
     numeric = pd.to_numeric(s, errors="coerce")
     excel_like = numeric.notna() & (numeric > 20000) & (numeric < 70000)
-    parsed_excel = pd.to_datetime(numeric.where(excel_like), unit="D", origin="1899-12-30", errors="coerce")
+    
+    parsed_excel_valid = pd.to_datetime(numeric[excel_like], unit="D", origin="1899-12-30", errors="coerce")
+    parsed_excel = pd.Series(pd.NaT, index=s.index)
+    parsed_excel.update(parsed_excel_valid)
 
     # Parse string timestamps.
     # We try a small set of explicit formats first (faster + avoids the pandas

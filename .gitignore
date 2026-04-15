@@ -10,6 +10,7 @@ __pycache__/
 # OS
 .DS_Store
 Thumbs.db
+archive/
 
 # Data (do not push to GitHub)
 Dataset/

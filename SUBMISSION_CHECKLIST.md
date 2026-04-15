@@ -41,3 +41,18 @@ powershell -ExecutionPolicy Bypass -File ".\tools\package_submission.ps1"
 
 This creates a timestamped folder under `artifacts/` with everything you should upload.
 
+## Optional viva metrics (generate only if asked)
+
+If a professor asks for explicit **train/val/test** metrics per model (aligned fairly with LSTM),
+generate them on demand:
+
+```powershell
+Set-Location "E:\ML Based Prediction Air Pollutants"
+.\.venv_std\Scripts\python.exe ".\tools\generate_viva_metrics.py" --out-csv ".\artifacts\viva_metrics_splits.csv" --out-notes ".\artifacts\viva_metrics_notes.json"
+```
+
+If you don't need these files, you can delete optional artifacts:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File ".\tools\cleanup_optional_artifacts.ps1"
+```
