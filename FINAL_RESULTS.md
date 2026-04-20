@@ -31,3 +31,17 @@ Source: `artifacts/lstm_metrics.json`
 - Table: `artifacts/metrics.csv`
 - Plots: `artifacts/plots/*.png`
 
+## Multi-Pollutant Forecasting (t+15 min) — Extension
+
+To address class feedback, we also train a **single multi-output model** that forecasts multiple pollutants simultaneously (default horizon: **+15 minutes**).
+
+- Metrics: `artifacts/multioutput_metrics.csv`
+- Metadata: `artifacts/multioutput_meta.json`
+- Plots: `artifacts/plots/viva/07_multioutput/*`
+
+## Comparative Study: Global vs Per-Station vs Routed
+
+To address the “per-station overfitting” viva question, train global models and compare:
+
+- Output: `artifacts/pm25_comparison.json`
+- Script: `8_compare_global_vs_station.py`

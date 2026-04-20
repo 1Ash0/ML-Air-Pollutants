@@ -38,14 +38,18 @@ artifacts/**/*.keras
 
 # Allow small final report outputs in artifacts
 !artifacts/metrics.csv
+!artifacts/multioutput_metrics.csv
 !artifacts/classical_metrics_routed_v4.json
 !artifacts/classical_metrics_per_station.json
 !artifacts/lstm_metrics.json
 !artifacts/feature_schema_v4.json
 !artifacts/standard_scaler_v4.json
 !artifacts/feature_splits_report_v4.json
+!artifacts/multioutput_meta.json
+!artifacts/pm25_comparison.json
 !artifacts/plots/
 !artifacts/plots/*.png
+!artifacts/plots/**/*.png
 
 # Local backup bundles
 artifacts/backup_models_*/

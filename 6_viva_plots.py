@@ -24,9 +24,11 @@ Run:
 
 from __future__ import annotations
 
+import argparse
 import json
 import logging
 from pathlib import Path
+from typing import Optional
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
@@ -41,9 +43,12 @@ ARTIFACTS          = Path("artifacts")
 PARQUET_TRAIN      = ARTIFACTS / "features_train_v4.parquet"
 PARQUET_TEST       = ARTIFACTS / "features_test_v4.parquet"
 METRICS_CSV        = ARTIFACTS / "metrics.csv"
+MULTIOUT_CSV       = ARTIFACTS / "multioutput_metrics.csv"
 JSON_PER_STATION   = ARTIFACTS / "classical_metrics_per_station.json"
 JSON_ROUTED        = ARTIFACTS / "classical_metrics_routed_v4.json"
 JSON_LSTM          = ARTIFACTS / "lstm_metrics.json"
+JSON_PM25_COMPARE  = ARTIFACTS / "pm25_comparison.json"
+JSON_MULTI_LSTM    = ARTIFACTS / "multi_lstm_metrics.json"
 OUT_DIR            = ARTIFACTS / "plots" / "viva"
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -163,12 +168,36 @@ def plot_pm25_violin(df: pd.DataFrame, out: Path) -> None:
     data = df[["station", "PM2.5"]].dropna()
 
     fig, ax = plt.subplots(figsize=(13, 7))
-    sns.violinplot(data=data, x="station", y="PM2.5", order=STATIONS,
-                   palette=STATION_COLORS, inner=None, ax=ax, alpha=0.55)
-    sns.boxplot(data=data, x="station", y="PM2.5", order=STATIONS,
-                palette=STATION_COLORS, width=0.14, showcaps=True,
-                flierprops=dict(marker=".", markersize=2, alpha=0.25),
-                ax=ax, linewidth=1.2, boxprops=dict(alpha=0.85))
+    # seaborn>=0.13 deprecates `palette` without `hue`; use hue=x and disable legend.
+    sns.violinplot(
+        data=data,
+        x="station",
+        y="PM2.5",
+        hue="station",
+        order=STATIONS,
+        palette=STATION_COLORS,
+        inner=None,
+        ax=ax,
+        alpha=0.55,
+        dodge=False,
+        legend=False,
+    )
+    sns.boxplot(
+        data=data,
+        x="station",
+        y="PM2.5",
+        hue="station",
+        order=STATIONS,
+        palette=STATION_COLORS,
+        width=0.14,
+        showcaps=True,
+        flierprops=dict(marker=".", markersize=2, alpha=0.25),
+        ax=ax,
+        linewidth=1.2,
+        boxprops=dict(alpha=0.85),
+        dodge=False,
+        legend=False,
+    )
 
     for i, stn in enumerate(STATIONS):
         sub  = data[data["station"] == stn]["PM2.5"]
@@ -627,6 +656,74 @@ def plot_all_models_comparison(out: Path) -> None:
     _save(fig, out)
 
 
+def plot_pm25_global_vs_routed(out: Path) -> None:
+    """Compare PM2.5 performance: Global models vs Routed ensemble vs LSTM.
+
+    This plot directly addresses a common viva concern:
+      "Per-station models use less data → risk overfitting.
+       Global models use more data → should generalize better."
+
+    We show Global Ridge + Global XGB (single model across all stations),
+    against the final Routed system (best classical model per station),
+    and the single-target LSTM baseline.
+    """
+    if not JSON_PM25_COMPARE.exists():
+        logging.warning("Missing %s; skipping global-vs-routed plot.", JSON_PM25_COMPARE)
+        return
+
+    cmpj = json.loads(JSON_PM25_COMPARE.read_text(encoding="utf-8"))
+    lstm = json.loads(JSON_LSTM.read_text(encoding="utf-8")) if JSON_LSTM.exists() else {}
+
+    rows = [
+        {"model": "GLOBAL_RIDGE", "rmse": cmpj["global_ridge"]["test"]["rmse"], "r2": cmpj["global_ridge"]["test"]["r2"]},
+        {"model": "GLOBAL_XGB", "rmse": cmpj["global_xgb"]["test"]["rmse"], "r2": cmpj["global_xgb"]["test"]["r2"]},
+        {"model": "ROUTED", "rmse": cmpj["routed_models"]["overall"]["rmse"], "r2": cmpj["routed_models"]["overall"]["r2"]},
+    ]
+    if lstm and "test_metrics" in lstm:
+        rows.append({"model": "LSTM", "rmse": lstm["test_metrics"]["rmse"], "r2": lstm["test_metrics"]["r2"]})
+
+    df = pd.DataFrame(rows)
+    order = ["GLOBAL_RIDGE", "GLOBAL_XGB", "LSTM", "ROUTED"]
+    df["model"] = pd.Categorical(df["model"], categories=order, ordered=True)
+    df = df.sort_values("model")
+
+    colors = {
+        "GLOBAL_RIDGE": "#0D47A1",
+        "GLOBAL_XGB": "#1B5E20",
+        "LSTM": "#6A1B9A",
+        "ROUTED": MODEL_COLORS["ROUTED"],
+    }
+
+    fig, axes = plt.subplots(1, 2, figsize=(15, 6))
+
+    # RMSE
+    ax = axes[0]
+    ax.bar(df["model"].astype(str), df["rmse"], color=[colors[m] for m in df["model"].astype(str)], edgecolor="white", linewidth=0.8)
+    ax.set_title("PM2.5 Global vs Routed — Test RMSE\n(lower is better)")
+    ax.set_ylabel("RMSE (µg/m³)")
+    ax.grid(True, axis="y", alpha=0.3)
+    for i, v in enumerate(df["rmse"].to_list()):
+        ax.text(i, float(v) + 0.05, f"{float(v):.2f}", ha="center", va="bottom", fontsize=9, fontweight="bold")
+
+    # R²
+    ax = axes[1]
+    ax.bar(df["model"].astype(str), df["r2"], color=[colors[m] for m in df["model"].astype(str)], edgecolor="white", linewidth=0.8)
+    ax.set_title("PM2.5 Global vs Routed — Test R²\n(higher is better)")
+    ax.set_ylabel("R²")
+    ax.set_ylim(0.0, 1.02)
+    ax.grid(True, axis="y", alpha=0.3)
+    for i, v in enumerate(df["r2"].to_list()):
+        ax.text(i, float(v) + 0.01, f"{float(v):.3f}", ha="center", va="bottom", fontsize=9, fontweight="bold")
+
+    fig.suptitle(
+        "Does Per-Station Routing Overfit? — Comparative Study\n"
+        "Global models see more data; Routed system reduces station heterogeneity (chosen by validation RMSE).",
+        fontsize=13, fontweight="bold"
+    )
+    plt.tight_layout()
+    _save(fig, out)
+
+
 def plot_feature_counts(out: Path) -> None:
     """
     Bar chart of #features used per station model after lag/rolling engineering.
@@ -778,6 +875,53 @@ def plot_lstm_history(out: Path) -> None:
     _save(fig, out)
 
 
+def plot_multi_lstm_history(out: Path) -> None:
+    """Multi-output LSTM loss curves (if available)."""
+    if not JSON_MULTI_LSTM.exists():
+        logging.info("No multi-output LSTM metrics JSON found; skipping.")
+        return
+    m = json.loads(JSON_MULTI_LSTM.read_text(encoding="utf-8"))
+    hist = m.get("history", {})
+    loss = hist.get("loss", [])
+    val_loss = hist.get("val_loss", [])
+    if not loss or not val_loss:
+        logging.warning("multi_lstm_metrics.json missing loss curves; skipping.")
+        return
+
+    epochs = list(range(1, len(loss) + 1))
+    fig, ax = plt.subplots(figsize=(12, 5.5))
+    ax.plot(epochs, loss, "o-", color="#1976D2", label="Train Loss", linewidth=2.2, markersize=7)
+    ax.plot(epochs, val_loss, "s--", color="#E53935", label="Validation Loss", linewidth=2.2, markersize=7)
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel("MSE Loss (normalised multi-target scale)")
+    ax.set_title("Multi-Output LSTM Training & Validation Loss\nTargets: 10 pollutants | Horizon: +15 minutes")
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    _save(fig, out)
+
+
+def plot_multi_lstm_per_target_r2(out: Path) -> None:
+    """Per-target R² for multi-output LSTM (ALL stations)."""
+    if not JSON_MULTI_LSTM.exists():
+        return
+    m = json.loads(JSON_MULTI_LSTM.read_text(encoding="utf-8"))
+    test_metrics = m.get("test_metrics", {})
+    if not isinstance(test_metrics, dict) or not test_metrics:
+        return
+
+    targets = sorted(test_metrics.keys())
+    r2_vals = [float(test_metrics[t].get("r2", float("nan"))) for t in targets]
+
+    fig, ax = plt.subplots(figsize=(14, max(6, 0.45 * len(targets))))
+    sns.barplot(x=r2_vals, y=targets, ax=ax, palette="deep")
+    ax.set_title("Multi-Output LSTM — Test R² per Pollutant Target (ALL Stations)\nForecast horizon: +15 minutes")
+    ax.set_xlabel("R²")
+    ax.set_ylabel("Target")
+    ax.axvline(0.0, color="#2B2B2B", linewidth=1.0, alpha=0.7)
+    ax.grid(True, axis="x", alpha=0.3)
+    _save(fig, out)
+
+
 def plot_lstm_per_station(out: Path) -> None:
     """
     3-panel bar chart (RMSE, MAE, R²) for LSTM per station.
@@ -920,6 +1064,66 @@ def plot_routing_summary(out: Path) -> None:
 # MAIN
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _resolve_from_archive(filename: str) -> Optional[Path]:
+    """Locate an archived copy of a file (best effort).
+
+    During GitHub cleanup we intentionally moved large Parquet feature splits out of
+    `artifacts/`. This helper lets plotting scripts keep working locally by finding
+    those files under `archive/` if needed.
+    """
+    archive_root = Path("archive")
+    if not archive_root.exists():
+        return None
+    matches = list(archive_root.rglob(filename))
+    if not matches:
+        return None
+    matches.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return matches[0]
+
+
+def _resolve_input_path(path: Path, archive_filename: str) -> Path:
+    """Resolve an input path with `archive/` fallback."""
+    if path.exists():
+        return path
+    alt = _resolve_from_archive(archive_filename)
+    if alt is None:
+        raise FileNotFoundError(f"Missing input: {path} (and no archive/{archive_filename} found)")
+    logging.warning("Input not found at %s; using archived copy: %s", path, alt)
+    return alt
+
+
+def main_cli() -> None:
+    """CLI wrapper that resolves moved parquets, then runs the legacy `main()`."""
+    parser = argparse.ArgumentParser(
+        description="Generate viva-ready plots (robust to archived Parquet feature splits)."
+    )
+    parser.add_argument("--train-parquet", type=str, default=str(Path("artifacts") / "features_train_v4.parquet"))
+    parser.add_argument("--test-parquet", type=str, default=str(Path("artifacts") / "features_test_v4.parquet"))
+    parser.add_argument("--metrics-csv", type=str, default=str(Path("artifacts") / "metrics.csv"))
+    parser.add_argument("--multioutput-csv", type=str, default=str(Path("artifacts") / "multioutput_metrics.csv"))
+    parser.add_argument("--out-dir", type=str, default=str(Path("artifacts") / "plots" / "viva"))
+    parser.add_argument("--max-corr-rows", type=int, default=60_000)
+    parser.add_argument("--log-level", type=str, default="INFO")
+    args = parser.parse_args()
+
+    logging.basicConfig(
+        level=getattr(logging, args.log_level.upper(), logging.INFO),
+        format="%(asctime)s | %(levelname)s | %(message)s",
+    )
+
+    global PARQUET_TRAIN, PARQUET_TEST, METRICS_CSV, MULTIOUT_CSV, OUT_DIR
+    PARQUET_TRAIN = _resolve_input_path(Path(args.train_parquet), "features_train_v4.parquet")
+    PARQUET_TEST = _resolve_input_path(Path(args.test_parquet), "features_test_v4.parquet")
+    METRICS_CSV = _resolve_input_path(Path(args.metrics_csv), "metrics.csv")
+    MULTIOUT_CSV = Path(args.multioutput_csv)
+    OUT_DIR = Path(args.out_dir)
+
+    global OUT_DIR_MAX_CORR_ROWS
+    OUT_DIR_MAX_CORR_ROWS = int(args.max_corr_rows)
+
+    main()
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s | %(levelname)s | %(message)s")
@@ -930,8 +1134,9 @@ def main() -> None:
     df_test  = _load_parquet(PARQUET_TEST)    # full — for correlation + cross-station
 
     # Sample test parquet for heavy pairwise correlation (keeps memory sane)
-    df_test_corr = (df_test.sample(n=min(60_000, len(df_test)), random_state=42)
-                    if len(df_test) > 60_000 else df_test)
+    max_corr = int(globals().get("OUT_DIR_MAX_CORR_ROWS", 60_000))
+    df_test_corr = (df_test.sample(n=min(max_corr, len(df_test)), random_state=42)
+                    if len(df_test) > max_corr else df_test)
 
     # ── 01 Data Overview ──────────────────────────────────────────────────────
     logging.info("01 Data Overview")
@@ -961,6 +1166,7 @@ def main() -> None:
     plot_grouped_bars_per_metric(d)                        # 3 files: rmse, mae, r2
     plot_performance_heatmap(d / "rmse_r2_heatmap.png")
     plot_all_models_comparison(d / "ridge_xgb_lstm_routed_comparison.png")
+    plot_pm25_global_vs_routed(d / "pm25_global_vs_routed.png")
     plot_feature_counts(d / "feature_count_per_station.png")
     plot_summary_scorecard(d / "final_scorecard.png")
 
@@ -969,6 +1175,8 @@ def main() -> None:
     d = OUT_DIR / "05_lstm"
     plot_lstm_history(d / "lstm_training_history.png")
     plot_lstm_per_station(d / "lstm_per_station_performance.png")
+    plot_multi_lstm_history(d / "multi_lstm_training_history.png")
+    plot_multi_lstm_per_target_r2(d / "multi_lstm_r2_per_target.png")
 
     # ── 06 Routing ───────────────────────────────────────────────────────────
     logging.info("06 Routing")
@@ -980,4 +1188,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main_cli()

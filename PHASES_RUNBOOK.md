@@ -87,3 +87,63 @@ Route the best model per station by validation RMSE and evaluate on test:
   --log-level INFO
 ```
 
+## 5) Viva pack (recommended)
+
+Generate 20+ viva-ready plots (correlation, station differences, model performance, routing justification).
+
+Note: `features_*_v4.parquet` files are large and may be stored under `archive/` after GitHub cleanup.
+This script auto-finds archived copies if the `artifacts/` paths are missing.
+
+```powershell
+.\.venv_std\Scripts\python.exe ".\6_viva_plots.py" `
+  --log-level INFO
+```
+
+## 6) (NEW) Multi-pollutant forecasting (sir feedback)
+
+Train a *single* multi-output model that predicts multiple pollutants **15 minutes ahead** (`t+1` for 15-min data).
+This produces `artifacts/multioutput_metrics.csv` and `artifacts/multioutput_meta.json`.
+
+```powershell
+.\.venv_std\Scripts\python.exe ".\3_train_multioutput.py" `
+  --train ".\artifacts\features_train_v4.parquet" `
+  --val   ".\artifacts\features_val_v4.parquet" `
+  --test  ".\artifacts\features_test_v4.parquet" `
+  --horizon-steps 1 `
+  --skip-xgb `
+  --log-level INFO
+```
+
+Create plots for the multi-output results:
+```powershell
+.\.venv_std\Scripts\python.exe ".\7_multioutput_plots.py" `
+  --metrics-csv ".\artifacts\multioutput_metrics.csv" `
+  --log-level INFO
+```
+
+Train a multi-output LSTM (optional, slower but good for viva comparison):
+```powershell
+.\.venv_std\Scripts\python.exe ".\4_train_lstm_multioutput.py" `
+  --train ".\artifacts\features_train_v4.parquet" `
+  --val   ".\artifacts\features_val_v4.parquet" `
+  --test  ".\artifacts\features_test_v4.parquet" `
+  --horizon-steps 1 `
+  --seq-len 96 `
+  --batch-size 128 `
+  --epochs 20 `
+  --reduce-lr-on-plateau `
+  --log-level INFO
+```
+
+## 7) (NEW) Comparative study: Global vs Per-station vs Routed
+
+To address the "per-station may overfit" viva question, train **global** (all-stations) models and write a comparison JSON.
+
+```powershell
+.\.venv_std\Scripts\python.exe ".\8_compare_global_vs_station.py" `
+  --train ".\artifacts\features_train_v4.parquet" `
+  --val   ".\artifacts\features_val_v4.parquet" `
+  --test  ".\artifacts\features_test_v4.parquet" `
+  --out-json ".\artifacts\pm25_comparison.json" `
+  --log-level INFO
+```

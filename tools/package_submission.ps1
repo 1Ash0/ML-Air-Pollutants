@@ -22,6 +22,9 @@ function Copy-IfExists([string]$Path, [string]$DestDir) {
 
 # Core report artifacts (small)
 Copy-IfExists (Join-Path $Artifacts "metrics.csv") $Out
+Copy-IfExists (Join-Path $Artifacts "multioutput_metrics.csv") $Out
+Copy-IfExists (Join-Path $Artifacts "multioutput_meta.json") $Out
+Copy-IfExists (Join-Path $Artifacts "pm25_comparison.json") $Out
 Copy-IfExists (Join-Path $Artifacts "classical_metrics_routed_v4.json") $Out
 Copy-IfExists (Join-Path $Artifacts "classical_metrics_per_station.json") $Out
 Copy-IfExists (Join-Path $Artifacts "lstm_metrics.json") $Out
@@ -29,9 +32,12 @@ Copy-IfExists (Join-Path $Artifacts "lstm_metrics.json") $Out
 # Plots
 $PlotsDir = Join-Path $Artifacts "plots"
 if (Test-Path $PlotsDir) {
-    Get-ChildItem $PlotsDir -Filter *.png | ForEach-Object {
-        Copy-Item $_.FullName (Join-Path $Out "plots") -Force
-        Write-Host "  + plots/$($_.Name)" -ForegroundColor Green
+    Get-ChildItem $PlotsDir -Recurse -Filter *.png | ForEach-Object {
+        $rel = $_.FullName.Substring($PlotsDir.Length).TrimStart("\","/")
+        $dest = Join-Path (Join-Path $Out "plots") $rel
+        New-Item -ItemType Directory -Force -Path (Split-Path $dest -Parent) | Out-Null
+        Copy-Item $_.FullName $dest -Force
+        Write-Host "  + plots/$rel" -ForegroundColor Green
     }
 } else {
     Write-Host "  ! Missing plots dir: $PlotsDir" -ForegroundColor Yellow
@@ -42,13 +48,19 @@ $CodeFiles = @(
     ".gitignore",
     "README.md",
     "PHASES_RUNBOOK.md",
-    "IMPLEMENTATION_STATUS.md",
+    "FINAL_RESULTS.md",
+    "SUBMISSION_CHECKLIST.md",
     "PROJECT_BLUEPRINT.md",
     "1_ingest_excel.py",
     "2_preprocess_and_features.py",
     "3_train_classical.py",
+    "3_train_multioutput.py",
     "4_train_lstm.py",
+    "4_train_lstm_multioutput.py",
     "5_evaluate_and_plot.py",
+    "6_viva_plots.py",
+    "7_multioutput_plots.py",
+    "8_compare_global_vs_station.py",
     "9_route_models_by_station.py",
     "requirements_ingest.txt",
     "requirements_ml.txt"
@@ -61,4 +73,3 @@ foreach ($f in $CodeFiles) {
 Write-Host ""
 Write-Host "Done. Bundle created at:" -ForegroundColor Cyan
 Write-Host "  $Out" -ForegroundColor Green
-

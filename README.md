@@ -51,6 +51,22 @@ We evaluated Ridge, XGBoost, and LSTM models. The final system is a **Routed Ens
 
 ---
 
+## Multi-Pollutant Forecasting (t+15 min) — Class Feedback Extension
+
+To avoid the “everyone predicted only PM2.5” issue, we also include a **single multi-output model** that forecasts multiple pollutants **15 minutes ahead** (station-safe; no cross-station leakage).
+
+Outputs:
+- `artifacts/multioutput_metrics.csv`
+- `artifacts/plots/viva/07_multioutput/`
+
+Key visuals:
+
+![Multioutput R2 Heatmap](artifacts/plots/viva/07_multioutput/multioutput_r2_heatmap_all.png)
+
+![Multioutput Station × Target](artifacts/plots/viva/07_multioutput/multioutput_station_target_r2_multi_ridge.png)
+
+---
+
 ## 🚀 How to Run the Pipeline
 
 1.  **Ingestion:** `1_ingest_excel.py` — Merges disparate multi-sheet Excel files into a canonical parquet master.
@@ -59,6 +75,8 @@ We evaluated Ridge, XGBoost, and LSTM models. The final system is a **Routed Ens
 4.  **Routing:** `9_route_models_by_station.py` — Selects the optimal model for each station based on local cross-validation.
 5.  **Deep Learning:** `4_train_lstm.py` — Benchmarks against a 3-layer LSTM with persistent time-context.
 6.  **Visualization:** `6_viva_plots.py` — Generates the publication-quality plots seen in this README.
+7.  **Multi-Output Extension:** `3_train_multioutput.py` + `7_multioutput_plots.py` — Forecasts multiple pollutants (t+15 min).
+8.  **Comparative Study:** `8_compare_global_vs_station.py` — Trains global models and compares against per-station/routed results.
 
 ---
 **Repository Policy:** Large data binaries (`.parquet`, `.h5`, `.joblib`) are excluded via `.gitignore`. The `artifacts/` folder contains only the metrics and plot assets for transparent review.

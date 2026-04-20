@@ -1,0 +1,35 @@
+{
+  "raw_targets": [
+    "PM2.5",
+    "PM10",
+    "NO2",
+    "SO2",
+    "CO",
+    "O3",
+    "NH3",
+    "NO",
+    "NOX",
+    "BENZ"
+  ],
+  "target_cols": [
+    "y_PM2.5_t+1",
+    "y_PM10_t+1",
+    "y_NO2_t+1",
+    "y_SO2_t+1",
+    "y_CO_t+1",
+    "y_O3_t+1",
+    "y_NH3_t+1",
+    "y_NO_t+1",
+    "y_NOX_t+1",
+    "y_BENZ_t+1"
+  ],
+  "horizon_steps": 1,
+  "n_features": 474,
+  "train_rows": 217651,
+  "val_rows": 54154,
+  "test_rows": 57624,
+  "notes": [
+    "Targets are forecasting labels (t + horizon_steps) computed per station.",
+    "Features include engineered lags/rolling means at time t; no station-crossing sequences."
+  ]
+}
