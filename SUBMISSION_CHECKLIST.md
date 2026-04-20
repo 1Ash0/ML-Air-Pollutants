@@ -13,6 +13,7 @@
   - `6_viva_plots.py`
   - `7_multioutput_plots.py`
   - `8_compare_global_vs_station.py`
+  - `10_route_multioutput_by_station_target.py`
   - `9_route_models_by_station.py`
 - Docs:
   - `README.md`
@@ -27,6 +28,8 @@
   - `artifacts/metrics.csv`
   - `artifacts/multioutput_metrics.csv`
   - `artifacts/multioutput_meta.json`
+  - `artifacts/multioutput_metrics_routed.csv`
+  - `artifacts/multioutput_routed.json`
   - `artifacts/pm25_comparison.json`
   - `artifacts/classical_metrics_routed_v4.json`
   - `artifacts/classical_metrics_per_station.json`

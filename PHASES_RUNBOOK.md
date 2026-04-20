@@ -121,6 +121,25 @@ Create plots for the multi-output results:
   --log-level INFO
 ```
 
+Route best model per (station, target) using validation RMSE (multi-output routing):
+```powershell
+.\.venv_std\Scripts\python.exe ".\10_route_multioutput_by_station_target.py" `
+  --train ".\artifacts\features_train_v4.parquet" `
+  --val   ".\artifacts\features_val_v4.parquet" `
+  --test  ".\artifacts\features_test_v4.parquet" `
+  --out-json ".\artifacts\multioutput_routed.json" `
+  --out-csv  ".\artifacts\multioutput_metrics_routed.csv" `
+  --log-level INFO
+```
+
+Then re-run the multi-output plots (adds routed visuals if routed csv exists):
+```powershell
+.\.venv_std\Scripts\python.exe ".\7_multioutput_plots.py" `
+  --metrics-csv ".\artifacts\multioutput_metrics.csv" `
+  --routed-csv  ".\artifacts\multioutput_metrics_routed.csv" `
+  --log-level INFO
+```
+
 Train a multi-output LSTM (optional, slower but good for viva comparison):
 ```powershell
 .\.venv_std\Scripts\python.exe ".\4_train_lstm_multioutput.py" `

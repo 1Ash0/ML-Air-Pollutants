@@ -144,10 +144,40 @@ def plot_target_bars(df: pd.DataFrame, out_dir: Path) -> None:
     save_fig(fig, out_dir / "multioutput_r2_bars_all.png")
 
 
+def plot_routed_heatmaps(routed_csv: Path, out_dir: Path) -> None:
+    """Heatmaps for the routed multi-output system (if present)."""
+    if not routed_csv.exists():
+        return
+    df = pd.read_csv(routed_csv)
+    sdf = df.loc[df["station"] != "ALL"].copy()
+    if sdf.empty:
+        return
+
+    piv_r2 = sdf.pivot_table(index="station", columns="target", values="r2", aggfunc="mean")
+    fig, ax = plt.subplots(figsize=(max(12, 0.9 * len(piv_r2.columns)), 5))
+    sns.heatmap(piv_r2, annot=True, fmt=".3f", cmap="RdYlGn", vmin=-1.0, vmax=1.0, linewidths=0.6, ax=ax)
+    ax.set_title("Routed Multi-Output System: Station × Target R² (Test)\nRouting criterion: lowest validation RMSE per (station,target)")
+    ax.set_xlabel("Pollutant Target")
+    ax.set_ylabel("Station")
+    save_fig(fig, out_dir / "multioutput_routed_station_target_r2.png")
+
+    sdf_all = df.loc[df["station"] == "ALL"].copy()
+    if not sdf_all.empty:
+        piv_rmse = sdf_all.pivot_table(index="target", values="rmse", aggfunc="mean").sort_values("rmse", ascending=False)
+        fig, ax = plt.subplots(figsize=(12, max(6, 0.4 * len(piv_rmse))))
+        sns.barplot(data=piv_rmse.reset_index(), x="rmse", y="target", ax=ax, color="#1B5E20")
+        ax.set_title("Routed Multi-Output System: RMSE per Target (ALL Stations, Test)")
+        ax.set_xlabel("RMSE")
+        ax.set_ylabel("Target")
+        ax.grid(True, axis="x", alpha=0.3)
+        save_fig(fig, out_dir / "multioutput_routed_rmse_per_target_all.png")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate viva-ready plots for multi-output pollutant forecasts.")
     parser.add_argument("--metrics-csv", type=str, default=str(Path("artifacts") / "multioutput_metrics.csv"))
     parser.add_argument("--out-dir", type=str, default=str(Path("artifacts") / "plots" / "viva" / "07_multioutput"))
+    parser.add_argument("--routed-csv", type=str, default=str(Path("artifacts") / "multioutput_metrics_routed.csv"))
     parser.add_argument("--log-level", type=str, default="INFO")
     args = parser.parse_args()
 
@@ -162,6 +192,7 @@ def main() -> int:
     plot_target_bars(df, out_dir=out_dir)
     plot_station_target_heatmap(df, out_dir=out_dir, model=None)
     plot_station_target_heatmaps_all_models(df, out_dir=out_dir)
+    plot_routed_heatmaps(Path(args.routed_csv), out_dir=out_dir)
 
     logging.info("Done. Multi-output plots written to: %s", out_dir)
     return 0

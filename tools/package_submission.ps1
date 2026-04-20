@@ -24,6 +24,8 @@ function Copy-IfExists([string]$Path, [string]$DestDir) {
 Copy-IfExists (Join-Path $Artifacts "metrics.csv") $Out
 Copy-IfExists (Join-Path $Artifacts "multioutput_metrics.csv") $Out
 Copy-IfExists (Join-Path $Artifacts "multioutput_meta.json") $Out
+Copy-IfExists (Join-Path $Artifacts "multioutput_metrics_routed.csv") $Out
+Copy-IfExists (Join-Path $Artifacts "multioutput_routed.json") $Out
 Copy-IfExists (Join-Path $Artifacts "pm25_comparison.json") $Out
 Copy-IfExists (Join-Path $Artifacts "classical_metrics_routed_v4.json") $Out
 Copy-IfExists (Join-Path $Artifacts "classical_metrics_per_station.json") $Out
@@ -61,6 +63,7 @@ $CodeFiles = @(
     "6_viva_plots.py",
     "7_multioutput_plots.py",
     "8_compare_global_vs_station.py",
+    "10_route_multioutput_by_station_target.py",
     "9_route_models_by_station.py",
     "requirements_ingest.txt",
     "requirements_ml.txt"

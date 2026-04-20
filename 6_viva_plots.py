@@ -913,7 +913,9 @@ def plot_multi_lstm_per_target_r2(out: Path) -> None:
     r2_vals = [float(test_metrics[t].get("r2", float("nan"))) for t in targets]
 
     fig, ax = plt.subplots(figsize=(14, max(6, 0.45 * len(targets))))
-    sns.barplot(x=r2_vals, y=targets, ax=ax, palette="deep")
+    # seaborn>=0.13 deprecates `palette` without `hue`; use hue=y and disable legend.
+    dfp = pd.DataFrame({"target": targets, "r2": r2_vals})
+    sns.barplot(data=dfp, x="r2", y="target", hue="target", ax=ax, palette="deep", legend=False, dodge=False)
     ax.set_title("Multi-Output LSTM — Test R² per Pollutant Target (ALL Stations)\nForecast horizon: +15 minutes")
     ax.set_xlabel("R²")
     ax.set_ylabel("Target")
