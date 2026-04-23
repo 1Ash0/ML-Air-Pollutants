@@ -93,12 +93,23 @@ def plot_station_target_heatmap(df: pd.DataFrame, out_dir: Path, model: Optional
         logging.warning("No per-station rows found for model=%s; skipping.", model)
         return
 
-    # Pick best model by mean R² if not specified.
+    # Pick best model by PM2.5 R² (if present) else mean R² if not specified.
     if model is None:
-        model_scores = sdf.groupby("model")["r2"].mean().sort_values(ascending=False)
+        pm25_keys = [t for t in sdf["target"].astype(str).unique() if "PM2.5" in t and "t+" in t]
+        pm25_key = pm25_keys[0] if pm25_keys else None
+        if pm25_key is not None:
+            model_scores = (
+                sdf.loc[sdf["target"].astype(str) == pm25_key]
+                .groupby("model")["r2"]
+                .mean()
+                .sort_values(ascending=False)
+            )
+            logging.info("Auto-selected best multi-output model by %s mean R²: %s", pm25_key, model_scores.index[0])
+        else:
+            model_scores = sdf.groupby("model")["r2"].mean().sort_values(ascending=False)
+            logging.info("Auto-selected best multi-output model by mean R²: %s", model_scores.index[0])
         model = str(model_scores.index[0])
         sdf = sdf.loc[sdf["model"] == model]
-        logging.info("Auto-selected best multi-output model by mean R²: %s", model)
 
     piv = sdf.pivot_table(index="station", columns="target", values="r2", aggfunc="mean")
     fig, ax = plt.subplots(figsize=(max(12, 0.9 * len(piv.columns)), 5))
